@@ -16,27 +16,44 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+extern char **environ;
+#define MAX_HISTORY 100
+char *history[MAX_HISTORY];
+int history_count = 0;
 /*
   Function Declarations for builtin shell commands:
  */
 int lsh_cd(char **args);
 int lsh_help(char **args);
 int lsh_exit(char **args);
-
+int lsh_pwd(char **args);
+int lsh_echo(char **args);
+int lsh_history(char **args);
+int lsh_type(char **args);
+int lsh_env(char **args);
 /*
   List of builtin commands, followed by their corresponding functions.
  */
 char *builtin_str[] = {
   "cd",
   "help",
-  "exit"
+  "exit",
+  "pwd",
+  "echo",
+  "history",
+  "type",
+  "env"
 };
 
 int (*builtin_func[]) (char **) = {
   &lsh_cd,
   &lsh_help,
-  &lsh_exit
+  &lsh_exit,
+  &lsh_pwd,
+  &lsh_echo,
+  &lsh_history,
+  &lsh_type,
+  &lsh_env
 };
 
 int lsh_num_builtins() {
@@ -256,6 +273,9 @@ void lsh_loop(void)
   do {
     printf("> ");
     line = lsh_read_line();
+     if (line[0] != '\0' && history_count < MAX_HISTORY) {
+        history[history_count++] = strdup(line);
+    }
     args = lsh_split_line(line);
     status = lsh_execute(args);
 
@@ -282,3 +302,60 @@ int main(int argc, char **argv)
   return EXIT_SUCCESS;
 }
 
+int lsh_pwd(char **args)
+{
+  char cwd[1024];
+  if (getcwd(cwd, sizeof(cwd)) != NULL) {
+    printf("%s\n", cwd);
+  } else {
+    perror("lsh");
+  }
+  return 1;
+}
+
+int lsh_echo(char **args)
+{
+  int i = 1;
+  while (args[i] != NULL) {
+    printf("%s ", args[i]);
+    i++;
+  }
+  printf("\n");
+  return 1;
+}
+
+int lsh_history(char **args)
+{
+  for (int i = 0; i < history_count; i++) {
+    printf("%d %s\n", i + 1, history[i]);
+  }
+  return 1;
+}
+
+int lsh_type(char **args) {
+    if (args[1] == NULL) {
+        printf("lsh: expected argument to \"type\"\n");
+        return 1;
+    }
+    for (int i = 0; i < lsh_num_builtins(); i++) {
+        if (strcmp(args[1], builtin_str[i]) == 0) {
+            printf("%s is a shell builtin\n", args[1]);
+            return 1;
+        }
+    }
+    printf("%s is external\n", args[1]);
+    return 1;
+}
+
+int lsh_env(char **args) {
+    if (environ == NULL) {
+        printf("lsh: environment is empty\n");
+        return 1;
+    }
+    char **env = environ;
+    while (*env) {
+        printf("%s\n", *env);
+        env++;
+    }
+    return 1;
+}
